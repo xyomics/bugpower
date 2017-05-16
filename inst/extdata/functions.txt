@@ -1,0 +1,178 @@
+<<BH_algorithm,echo=FALSE,message=FALSE>>=
+#Use the multtest package with a friendlier interface.  x is your
+#vector of raw p values, and the output is the corrected vector with
+#the order maintained.
+library(multtest)
+adjp <- function(x,proc="BH",...){
+  require(multtest)
+  tmp <- mt.rawp2adjp(x,proc=proc,...)
+  tmp <- tmp$adjp[order(tmp$index),]
+  #rownames(tmp) <- names(x)
+  return(tmp)
+}
+@
+
+<<whole_metagenome_shotgun_power,echo=FALSE,message=FALSE>>=
+calc_power_BH <- function(N_sample,n_covariate,conti_prop=0.5,n_feature,pos_prop,contin=TRUE,increment=0.005,q_cutoff = 0.05){
+  quartile_common = c(0.081,0.1,0.15)
+  quartile_rare = c(0.016,0.027,0.058)
+
+  # return power and corresponding effect size
+  n_continuous = ceiling(conti_prop*n_covariate)
+  n_discrete = floor(conti_prop*n_covariate)
+  power_current_min = 0
+  power_current = c()
+  fpr_current = c()
+  beta_interest = 0
+  power_out = c()
+  fpr_out = c()
+  beta_out = c()
+  num_rep = 100
+  while(power_current_min < 1){
+    qvalue_matrix = matrix(rep(0,num_rep*n_feature),nrow=num_rep)
+    start.time <- Sys.time()
+    for( rep.i in 1:num_rep ){
+      ## initialize p-value vector for each replicate
+      #pvalue_v = (rep(1,n_feature))
+      pvalue_v = c()
+      ## simulate covariates
+      dat_continuous = matrix(rnorm(n_continuous*N_sample,mean=0,sd=1),nrow=N_sample)
+      dat_discrete = matrix(rbinom(n_discrete*N_sample,size=1,prob=0.5),nrow=N_sample)
+
+      ## assign coefficient for positive features and negative features separately
+      beta_continuous_neg = rep(0.1,n_continuous)
+      beta_discrete_neg = rep(0.1,n_discrete)
+      beta_continuous_pos = rep(0.1,n_continuous)
+      beta_discrete_pos = rep(0.1,n_discrete)
+
+      ## assign coefficient for covariate of interest
+      if(contin){
+        beta_continuous_pos[1] = beta_interest
+        beta_continuous_neg[1] = 0
+        beta_all_pos = c(beta_continuous_pos,beta_discrete_pos)
+        beta_all_neg = c(beta_continuous_neg,beta_discrete_neg)
+        dat_all = cbind(dat_continuous,dat_discrete)
+      }else{
+        beta_discete_pos[1] = beta_interest
+        beta_discete_neg[1] = 0
+        beta_all_pos = c(beta_discrete_pos,beta_continuous_pos)
+        beta_all_neg = c(beta_discrete_neg,beta_continuous_neg)
+        dat_all = cbind(dat_discrete,dat_continuous)
+      }
+
+      # number of positive and negative features
+      n_feature_pos = ceiling(n_feature*pos_prop)
+      n_feature_neg = n_feature - n_feature_pos
+
+      # sample mean
+      v_mean = sample(v_mean_transform,n_feature,replace=TRUE)
+      v_mean_common = sort(v_mean)[1:(n_feature/2)]
+      index_common_pos = sample(1:length(v_mean_common),0.2*length(v_mean_common),replace=FALSE)
+      v_mean_common_pos = v_mean_common[1:length(v_mean_common) %in% index_common_pos]
+      v_mean_common_neg = v_mean_common[!(1:length(v_mean_common) %in% index_common_pos)]
+
+      v_mean_rare = sort(v_mean)[(n_feature/2+1):n_feature]
+      index_rare_pos = sample(1:length(v_mean_rare),0.2*length(v_mean_rare),replace=FALSE)
+      v_mean_rare_pos = v_mean_rare[1:length(v_mean_rare) %in% index_rare_pos]
+      v_mean_rare_neg = v_mean_rare[!(1:length(v_mean_rare) %in% index_rare_pos)]
+
+      ## calculate p-value for positive features
+      dat_all_df = data.frame(dat_all)
+      fix_pos = dat_all %*% beta_all_pos
+      v_sd_common_pos = c(rep(quartile_common[1],length(v_mean_common_pos)/3),rep(quartile_common[2],length(v_mean_common_pos)/3),rep(quartile_common[3],length(v_mean_common_pos)/3))
+      v_sd_rare_pos = c(rep(quartile_rare[1],length(v_mean_rare_pos)/3),rep(quartile_rare[2],length(v_mean_rare_pos)/3),rep(quartile_rare[3],length(v_mean_rare_pos)/3))
+      for(feature.i in 1:length(v_mean_common_pos)){
+          Y = v_mean_common_pos[feature.i] + fix_pos + rnorm(N_sample,mean=0,sd=v_sd_common_pos[feature.i])
+          summary_lm = summary(lm(Y~.,data=dat_all_df))
+          pvalue_v = c(pvalue_v,summary_lm$coefficients[2,4])
+      }
+      for(feature.i in 1:length(v_mean_rare_pos)){
+        Y = v_mean_rare_pos[feature.i] + fix_pos + rnorm(N_sample,mean=0,sd=v_sd_rare_pos[feature.i])
+        summary_lm = summary(lm(Y~.,data=dat_all_df))
+        pvalue_v = c(pvalue_v,summary_lm$coefficients[2,4])
+      }
+
+      ## calculate p-value for negative features
+      fix_neg = dat_all %*% beta_all_neg
+      v_sd_common_neg = c(rep(quartile_common[1],length(v_mean_common_neg)/3),rep(quartile_common[2],length(v_mean_common_neg)/3),rep(quartile_common[3],length(v_mean_common_neg)/3))
+      v_sd_rare_neg = c(rep(quartile_rare[1],length(v_mean_rare_neg)/3),rep(quartile_rare[2],length(v_mean_rare_neg)/3),rep(quartile_rare[3],length(v_mean_rare_neg)/3))
+      for(feature.i in 1:length(v_mean_common_neg)){
+        Y = v_mean_common_neg[feature.i] + fix_neg + rnorm(N_sample,mean=0,sd=v_sd_common_neg[feature.i])
+        summary_lm = summary(lm(Y~.,data=dat_all_df))
+        pvalue_v = c(pvalue_v,summary_lm$coefficients[2,4])
+      }
+      for(feature.i in 1:length(v_mean_rare_neg)){
+        Y = v_mean_rare_neg[feature.i] + fix_neg + rnorm(N_sample,mean=0,sd=v_sd_rare_neg[feature.i])
+        summary_lm = summary(lm(Y~.,data=dat_all_df))
+        pvalue_v = c(pvalue_v,summary_lm$coefficients[2,4])
+      }
+
+      qvalue_matrix[rep.i,] = adjp(pvalue_v)[,2]
+    }
+
+    is.sig = qvalue_matrix < q_cutoff
+    feature_power = apply(is.sig,2,mean)
+    power_current_common1 = mean(feature_power[1:(n_feature_pos/6)])
+    power_current_common2 = mean(feature_power[(n_feature_pos/6+1):((n_feature_pos/6)*2)])
+    power_current_common3 = mean(feature_power[((n_feature_pos/6)*2+1):((n_feature_pos/6)*3)])
+    power_current_rare1 = mean(feature_power[((n_feature_pos/6)*3+1):((n_feature_pos/6)*4)])
+    power_current_rare2 = mean(feature_power[((n_feature_pos/6)*4+1):((n_feature_pos/6)*5)])
+    power_current_rare3 = mean(feature_power[((n_feature_pos/6)*5+1):((n_feature_pos/6)*6)])
+    fpr_current_common1 = mean(feature_power[(n_feature_pos+1):(n_feature_pos+n_feature_neg/6)])
+    fpr_current_common2 = mean(feature_power[(n_feature_pos+n_feature_neg/6+1):(n_feature_pos+n_feature_neg/6*2)])
+    fpr_current_common3 = mean(feature_power[(n_feature_pos+n_feature_neg/6*2+1):(n_feature_pos+n_feature_neg/6*3)])
+    fpr_current_rare1 = mean(feature_power[(n_feature_pos+n_feature_neg/6*3+1):(n_feature_pos+n_feature_neg/6*4)])
+    fpr_current_rare2 = mean(feature_power[(n_feature_pos+n_feature_neg/6*4+1):(n_feature_pos+n_feature_neg/6*5)])
+    fpr_current_rare3 = mean(feature_power[(n_feature_pos+n_feature_neg/6*5+1):(n_feature_pos+n_feature_neg/6*6)])
+
+    power_current = c(power_current_common1,power_current_common2,power_current_common3,power_current_rare1,power_current_rare2,power_current_rare3)
+    fpr_current = c(fpr_current_common1,fpr_current_common2,fpr_current_common3,fpr_current_rare1,fpr_current_rare2,fpr_current_rare3)
+    power_current_min = min(power_current)
+
+    power_out = rbind(power_out,power_current)
+    fpr_out = rbind(fpr_out,fpr_current)
+    beta_out = c(beta_out,beta_interest)
+
+    beta_interest = beta_interest + increment
+    #print(c(beta_interest,power_current,fpr_current))
+    # calculate time for each beta
+    #end.time <- Sys.time()
+    #print(end.time - start.time)
+  }
+
+  abundance_out =
+
+  out = data.frame(cbind(power_out,fpr_out,beta_out))
+  colnames(out) = c("power_com1","power_com2","power_com3","power_rare1","power_rare2","power_rare3",
+                    "fpr_com1","fpr_com2","fpr_com3","fpr_rare1","fpr_rare2","fpr_rare3","beta")
+  return(out)
+}
+@
+
+<<plot_power,echo=FALSE>>=
+plot_power <-function(power.obj,target_power=0.9,target_fpr=0.05){
+  require(ggplot2)
+  require(reshape2)
+  require(gridExtra)
+
+  #data preparation
+  df_common_power = power.obj[,c("power_com1","power_com2","power_com3","beta")]
+  df_common_power = melt(df_common_power,id="beta")
+  df_common_fpr = power.obj[,c("fpr_com1","fpr_com2","fpr_com3","beta")]
+  df_common_fpr = melt(df_common_fpr,id="beta")
+  df_rare_power = power.obj[,c("power_rare1","power_rare2","power_rare3","beta")]
+  df_rare_power = melt(df_rare_power,id="beta")
+  df_rare_fpr = power.obj[,c("fpr_rare1","fpr_rare2","fpr_rare3","beta")]
+  df_rare_fpr = melt(df_rare_fpr,id="beta")
+  #plot
+  p_common_power = ggplot(df_common_power,aes(x=beta,y=value)) + geom_line(aes(group=variable,colour=variable)) + geom_hline(yintercept=target_power, linetype="dashed", color = "red") +
+    theme_bw() + labs(title="common",y="power") + scale_y_continuous(breaks=c(0,0.25,0.5,0.75,target_power,1),limits = c(0,1))
+  p_rare_power = ggplot(df_rare_power,aes(x=beta,y=value)) + geom_line(aes(group=variable,colour=variable)) + geom_hline(yintercept=target_power, linetype="dashed", color = "red") +
+    theme_bw() + labs(title="rare",y="power") + scale_y_continuous(breaks=c(0,0.25,0.5,0.75,target_power,1),limits = c(0,1))
+  p_common_fpr = ggplot(df_common_fpr,aes(x=beta,y=value)) + geom_line(aes(group=variable,colour=variable)) + geom_hline(yintercept=target_fpr, linetype="dashed", color = "red") +
+    theme_bw() + labs(title="common",y="fpr") + scale_y_continuous(breaks=c(0,0.02,0.04,0.06,0.08,0.10,target_fpr),limits = c(0,0.1))
+  p_rare_fpr = ggplot(df_rare_fpr,aes(x=beta,y=value)) + geom_line(aes(group=variable,colour=variable)) + geom_hline(yintercept=target_fpr, linetype="dashed", color = "red") +
+    theme_bw() + labs(title="rare",y="fpr") + scale_y_continuous(breaks=c(0,0.02,0.04,0.06,0.08,0.10,target_fpr),limits = c(0,0.1))
+  print(grid.arrange(p_common_power,p_rare_power,p_common_fpr,p_rare_fpr,ncol=1))
+}
+@
