@@ -5,7 +5,7 @@ Generate power analysis report for microbiome dataset
 
 library(devtools)
 
-install_github("xyomics/bugpower")
+install_github("xyomics/bugpower",build_vignettes = TRUE)
 
 library(bugpower)
 
