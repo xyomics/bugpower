@@ -1,0 +1,13 @@
+Package: bugpower
+Type: Package
+Title: Generate power calculation report for microbiome data
+Version: 0.1.0
+Author: Liu Cao
+Maintainer: Liu Cao <xyomics@gmail.com>
+Description: Input your study design, get the power analysis report.
+License: GPL-3
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 6.0.1
+Suggests: knitr, rmarkdown
+VignetteBuilder: knitr
