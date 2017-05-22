@@ -44,7 +44,7 @@ write_report(outputdir = "/Users/cello/Desktop/",
 
 
 
-##More unitilities provided in the package
+##More untilities provided in the package
 
 
 ##References
