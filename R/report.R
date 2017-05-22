@@ -11,7 +11,7 @@
 #' @param N_feature Number of features in each data set. Vector. Default is c(300,300,300).
 #' @param N_repeat Number of repeat measurements for each data set. Vector. Default is c(2,2,2).
 #' @param N_covariate Number of covariates in the study. Number. Default is 5.
-#' @param contin The type of covariate we are interested. The type includeds "continous", "discrete" and "inter" (interaction). Strint. Default is c("continuous","continuous","continuous").
+#' @param contin The type of covariate we are interested. The type includeds "continuous", "discrete" and "inter" (interaction). Strint. Default is c("continuous","continuous","continuous").
 #' @param contin_prop The proportion of continuous covariates. Vector. Default is c(0.5,0.5,0.5)
 #' @param pos_prop The proportion of features correlated with the variable we are interested in. Vector. Default is c(0.2,0.2,0.2)
 #' @param increment A small number to adjust the smoothness of the power curve. The smaller, the more smooth. Default is 0.005.
@@ -36,7 +36,7 @@ write_report <- function(outputdir,
                          N_feature = c(300,300,300),
                          N_covariate = c(5,5,5),
                          N_repeat = c(1,1,1),
-                         contin = c(TRUE,TRUE,TRUE),
+                         contin = c("continuous","continuous","continuous"),
                          conti_prop = c(0.5,0.5,0.5),
                          pos_prop = c(0.2,0.2,0.2),
                          increment = 0.005,
@@ -56,6 +56,13 @@ write_report <- function(outputdir,
 ){
   setwd(outputdir)
   rnwfilename = paste0(outputdir,filename,".Rnw")
+  if(sum(datatype %in% c("species", "metagenomics_pathways","metatranscriptomics_pathways")) != length(datatype) ){
+    stop("Misspecified datatype.\n datatype should be 'species', 'metagenomics_pathways' or 'metatranscriptomics_pathways'")
+    print("datatype error")
+  }
+  if(sum(contin %in% c("continuous", "discrete", "inter", "time")) != length(contin)){
+    stop("Misspecified variable type. \n contin should be 'continous', 'discrete', 'inter' or 'time'")
+  }
   write_setup(rnwfilename)
   write_parameters(rnwfilename,
                    datatype,
@@ -80,7 +87,6 @@ write_report <- function(outputdir,
                    sd_quartile_pathway_rna_common,
                    sd_quartile_pathway_rna_rare,
                    source )
-  #write_functions(filename)
   write_docmeta(rnwfilename,author,title)
   write_intro(rnwfilename,datatype)
   write_results(rnwfilename,datatype)

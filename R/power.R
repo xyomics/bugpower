@@ -8,7 +8,7 @@
 #' @param N_repeat Number of repeat measurements for each data set. Integer.
 #' @param conti_prop The proportion of continuous covariates. A number in [0,1]. Default is 0.5.
 #' @param pos_prop The proportion of species or pathways that are truely correlated with the covariate we are interested in. A number in [0,1]. Default is 0.2.
-#' @param contin The type of covariate we are interested. The type includeds "continous", "discrete" and "inter" (interaction). Strint. Default is "continuous".
+#' @param contin The type of covariate we are interested. The type includeds "continuous", "discrete", "inter" (interaction), "time". Strint. Default is "continuous".
 #' @param increment A small number to adjust the smoothness of the power curve. The smaller, the more smooth. Default is 0.005.
 #' @param q_cutoff The threshold for q value (p value after BH adjustment). A number in (0,1). Default is 0.05.
 #' @param quartile_sd Standard deviation quartiles
@@ -213,8 +213,10 @@ calc_power <- function(N_sample=200,
   #print(length(diff_out))
   #print(diff_out)
 
-  out = data.frame(cbind(power_out,fpr_out,beta_out,diff_out))
+  out = cbind(power_out,fpr_out,beta_out,diff_out)
   colnames(out) = c("power_1","power_2","power_3","fpr_1","fpr_2","fpr_3","beta","diff_out")
+  rownames(out) = NULL
+  out = as.data.frame(out)
   return(out)
 }
 
@@ -495,9 +497,11 @@ calc_power_common_rare <- function(N_sample=200,
     #print(end.time - start.time)
   }
 
-  out_common = data.frame(cbind(power_out,fpr_out,beta_out))
+  out_common = cbind(power_out,fpr_out,beta_out)
   colnames(out_common) = c("power_1","power_2","power_3",
                            "fpr_1","fpr_2","fpr_3","beta")
+  rownames(out_common) = NULL
+  out_common = as.data.frame(out_common)
 
 
 
@@ -674,25 +678,36 @@ calc_power_common_rare <- function(N_sample=200,
     #print(end.time - start.time)
   }
 
-  out_rare = data.frame(cbind(power_out,fpr_out,beta_out))
+  out_rare = cbind(power_out,fpr_out,beta_out)
   colnames(out_rare) = c("power_1","power_2","power_3",
                          "fpr_1","fpr_2","fpr_3","beta")
+  rownames(out_rare) = NULL
+  out_rare = as.data.frame(out_rare)
 
 
   ## calculate min difference
 
-  v_sd_diff = c(v_sd_common_pos,v_sd_rare_pos,v_sd_common_neg,v_sd_rare_neg)
-  v_mean_diff = v_mean
+  #v_sd_diff = c(v_sd_common_pos,v_sd_rare_pos,v_sd_common_neg,v_sd_rare_neg)
+  #v_mean_diff = v_mean
 
-  Y_diff = matrix(rep(v_mean_diff,dim(dat_all)[1]),nrow=dim(dat_all)[1],byrow=TRUE) +
-    matrix(rnorm(dim(dat_all)[1]*length(v_sd_diff),mean=0,sd=rep(v_sd_diff,dim(dat_all)[1])),nrow=dim(dat_all)[1],byrow=TRUE)
-  fix_neg = c(dat_all %*% beta_all_neg)
-  Y_diff_neg = Y_diff + fix_neg
+  #Y_diff = matrix(rep(v_mean_diff,dim(dat_all)[1]),nrow=dim(dat_all)[1],byrow=TRUE) +
+  #  matrix(rnorm(dim(dat_all)[1]*length(v_sd_diff),mean=0,sd=rep(v_sd_diff,dim(dat_all)[1])),nrow=dim(dat_all)[1],byrow=TRUE)
+  v_mean_common = c(v_mean_common_pos,v_mean_common_neg)
+  #v_sd_common = c(v_sd_common_pos,v_sd_common_neg)
+  Y_diff_common = rnorm(dim(dat_all)[1],mean=sample(v_mean_common,dim(dat_all)[1],replace = TRUE),sd=sample(quartile_common,dim(dat_all)[1],replace = TRUE))
+
+  #fix_neg = c(dat_all %*% beta_all_neg)
+  #print(beta_all_neg)
+  #Y_diff_common = Y_diff_common + fix_neg
+  dat_all_neg = dat_all
+  dat_all_neg[,1] = dat_all_neg[,1] - 1
 
   for(i in out_common$beta){
     beta_all_pos[1] = i
+    fix_neg = c(dat_all_neg %*% beta_all_pos)
     fix_pos = c(dat_all %*% beta_all_pos)
-    Y_diff_pos = Y_diff + fix_pos
+    Y_diff_pos = Y_diff_common + fix_pos
+    Y_diff_neg = Y_diff_common + fix_neg
     diff_out = c(diff_out,mean(sin(Y_diff_pos^2))-mean(sin(Y_diff_neg^2)))
   }
   #print(diff_out)
@@ -700,15 +715,23 @@ calc_power_common_rare <- function(N_sample=200,
 
   diff_out = c()
 
+  v_mean_rare = c(v_mean_rare_pos,v_mean_rare_neg)
+  #v_sd_rare = c(v_sd_rare_pos,v_sd_rare_neg)
+  Y_diff_rare = rnorm(dim(dat_all)[1],mean=sample(v_mean_rare,dim(dat_all)[1],replace = TRUE),sd=sample(quartile_rare,dim(dat_all)[1],replace = TRUE))
+
   for(i in out_rare$beta){
     beta_all_pos[1] = i
+    fix_neg = c(dat_all_neg %*% beta_all_pos)
     fix_pos = c(dat_all %*% beta_all_pos)
-    Y_diff_pos = Y_diff + fix_pos
+    Y_diff_pos = Y_diff_common + fix_pos
+    Y_diff_neg = Y_diff_common + fix_neg
     diff_out = c(diff_out,mean(sin(Y_diff_pos^2))-mean(sin(Y_diff_neg^2)))
   }
   #print(diff_out)
   out_rare$diff_out = diff_out
-
   return(list(out_common=out_common,
               out_rare=out_rare))
 }
+
+
+
