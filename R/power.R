@@ -75,10 +75,10 @@ calc_power <- function(N_sample=200,
 
       ## assign coefficient for positive features and negative features separately
       #print("assign coefficient for positive features and negative features separately")
-      beta_continuous_neg = rep(0.1,n_continuous)
-      beta_discrete_neg = rep(0.1,n_discrete)
-      beta_continuous_pos = rep(0.1,n_continuous)
-      beta_discrete_pos = rep(0.1,n_discrete)
+      beta_continuous_neg = rep(0.5,n_continuous)
+      beta_discrete_neg = rep(0.5,n_discrete)
+      beta_continuous_pos = rep(0.5,n_continuous)
+      beta_discrete_pos = rep(0.5,n_discrete)
 
       ## assign coefficient for covariate of interest
       #print("assign coefficient for covariate of interest")
@@ -91,8 +91,8 @@ calc_power <- function(N_sample=200,
           dat_all = cbind(dat_continuous,dat_discrete)
         }
         else{
-          beta_all_pos = c(beta_continuous_pos,beta_discrete_pos,0.1)
-          beta_all_neg = c(beta_continuous_neg,beta_discrete_neg,0.1)
+          beta_all_pos = c(beta_continuous_pos,beta_discrete_pos,0.5)
+          beta_all_neg = c(beta_continuous_neg,beta_discrete_neg,0.5)
           dat_all = cbind(dat_continuous,dat_discrete,dat_time)
         }
       }
@@ -105,8 +105,8 @@ calc_power <- function(N_sample=200,
           dat_all = cbind(dat_discrete,dat_continuous)
         }
         else{
-          beta_all_pos = c(beta_discrete_pos,beta_continuous_pos,0.1)
-          beta_all_neg = c(beta_discrete_neg,beta_continuous_neg,0.1)
+          beta_all_pos = c(beta_discrete_pos,beta_continuous_pos,0.5)
+          beta_all_neg = c(beta_discrete_neg,beta_continuous_neg,0.5)
           dat_all = cbind(dat_discrete,dat_continuous,dat_time)
         }
       }
@@ -118,8 +118,8 @@ calc_power <- function(N_sample=200,
           dat_all = cbind(inter,dat_discrete,dat_continuous)
         }
         else{
-          beta_all_pos = c(beta_interest,beta_discrete_pos,beta_continuous_pos,0.1)
-          beta_all_neg = c(0,beta_discrete_neg,beta_continuous_neg,0.1)
+          beta_all_pos = c(beta_interest,beta_discrete_pos,beta_continuous_pos,0.5)
+          beta_all_neg = c(0,beta_discrete_neg,beta_continuous_neg,0.5)
           inter = dat_discrete[,1]*dat_discrete[,2]
           dat_all = cbind(inter,dat_discrete,dat_continuous,dat_time)
         }
@@ -194,24 +194,29 @@ calc_power <- function(N_sample=200,
   }
 
   ## calculate min difference
+  diff_out_common = c()
 
-  v_sd_diff = c(rep(quartile_sd[1],floor(length(v_mean_transform)/3)),
-                rep(quartile_sd[2],floor(length(v_mean_transform)/3)),
-                rep(quartile_sd[3],length(v_mean_transform) - floor(length(v_mean_transform)/3)*2))
-  Y_diff = matrix(rep(v_mean_transform,dim(dat_all)[1]),nrow=dim(dat_all)[1],byrow=TRUE) +
-    matrix(rnorm(dim(dat_all)[1]*length(v_sd_diff),mean=0,sd=rep(v_sd_diff,dim(dat_all)[1])),nrow=dim(dat_all)[1],byrow=TRUE)
-  fix_neg = c(dat_all %*% beta_all_neg)
-  Y_diff_neg = Y_diff + fix_neg
-  #print(length(beta_out))
-  #print(beta_out)
-  for(i in beta_out){
-    beta_all_pos[1] = i
-    fix_pos = c(dat_all %*% beta_all_pos)
-    Y_diff_pos = Y_diff + fix_pos
-    diff_out = c(diff_out,mean(sin(Y_diff_pos^2))-mean(sin(Y_diff_neg^2)))
+  for(j in 1:100){
+    sample(v_mean_transform,N_feature,replace=TRUE)
+
+    # common
+    Y_diff_common = rnorm(dim(dat_all)[1],mean=sample(v_mean_transform,dim(dat_all)[1],replace = TRUE),sd=sample(quartile_sd,dim(dat_all)[1],replace = TRUE))
+
+    dat_all_neg = dat_all
+    dat_all_neg[,1] = dat_all_neg[,1] - 1
+
+    diff_out = c()
+    for(i in out_common$beta){
+      beta_all_pos[1] = i
+      fix_neg = dat_all_neg[,1]*i
+      fix_pos = dat_all[,1]*i
+      Y_diff_pos = Y_diff_common + fix_pos
+      Y_diff_neg = Y_diff_common + fix_neg
+      diff_out = c(diff_out,mean(sin(Y_diff_pos^2*sign(Y_diff_pos))-mean(sin(Y_diff_neg^2*sign(Y_diff_neg)))))
+    }
+    diff_out_common = rbind(diff_out_common,diff_out)
+
   }
-  #print(length(diff_out))
-  #print(diff_out)
 
   out = cbind(power_out,fpr_out,beta_out,diff_out)
   colnames(out) = c("power_1","power_2","power_3","fpr_1","fpr_2","fpr_3","beta","diff_out")
@@ -341,13 +346,10 @@ calc_power_common_rare <- function(N_sample=200,
   while(power_current_min < 0.99){
     qvalue_matrix = matrix(rep(0,num_rep*N_feature), nrow=num_rep)
     start.time <- Sys.time()
-    #print(power_current_min)
     for( rep.i in 1:num_rep ){
       ## initialize p-value vector for each replicate
-      #print("initialize p-value vector for each replicate")
       pvalue_v = c()
       ## simulate covariates
-      #print("simulate covariates")
       dat_continuous = matrix(rnorm(n_continuous*N_sample,mean=0,sd=1),nrow=N_sample)
       dat_discrete = matrix(rbinom(n_discrete*N_sample,size=1,prob=0.5),nrow=N_sample)
       if(N_repeat > 1){
@@ -362,14 +364,12 @@ calc_power_common_rare <- function(N_sample=200,
       }
 
       ## assign coefficient for positive features and negative features separately
-      #print("assign coefficient for positive features and negative features separately")
-      beta_continuous_neg = rep(0.1,n_continuous)
-      beta_discrete_neg = rep(0.1,n_discrete)
-      beta_continuous_pos = rep(0.1,n_continuous)
-      beta_discrete_pos = rep(0.1,n_discrete)
+      beta_continuous_neg = rep(0.5,n_continuous)
+      beta_discrete_neg = rep(0.5,n_discrete)
+      beta_continuous_pos = rep(0.5,n_continuous)
+      beta_discrete_pos = rep(0.5,n_discrete)
 
       ## assign coefficient for covariate of interest
-      #print("assign coefficient for covariate of interest")
       if(contin == "continuous"){
         beta_continuous_pos[1] = beta_interest
         beta_continuous_neg[1] = 0
@@ -379,8 +379,8 @@ calc_power_common_rare <- function(N_sample=200,
           dat_all = cbind(dat_continuous,dat_discrete)
         }
         else{
-          beta_all_pos = c(beta_continuous_pos,beta_discrete_pos,0.1)
-          beta_all_neg = c(beta_continuous_neg,beta_discrete_neg,0.1)
+          beta_all_pos = c(beta_continuous_pos,beta_discrete_pos,0.5)
+          beta_all_neg = c(beta_continuous_neg,beta_discrete_neg,0.5)
           dat_all = cbind(dat_continuous,dat_discrete,dat_time)
         }
       }
@@ -393,8 +393,8 @@ calc_power_common_rare <- function(N_sample=200,
           dat_all = cbind(dat_discrete,dat_continuous)
         }
         else{
-          beta_all_pos = c(beta_discrete_pos,beta_continuous_pos,0.1)
-          beta_all_neg = c(beta_discrete_neg,beta_continuous_neg,0.1)
+          beta_all_pos = c(beta_discrete_pos,beta_continuous_pos,0.5)
+          beta_all_neg = c(beta_discrete_neg,beta_continuous_neg,0.5)
           dat_all = cbind(dat_discrete,dat_continuous,dat_time)
         }
       }
@@ -406,8 +406,8 @@ calc_power_common_rare <- function(N_sample=200,
           dat_all = cbind(inter,dat_discrete,dat_continuous)
         }
         else{
-          beta_all_pos = c(beta_interest,beta_discrete_pos,beta_continuous_pos,0.1)
-          beta_all_neg = c(0,beta_discrete_neg,beta_continuous_neg,0.1)
+          beta_all_pos = c(beta_interest,beta_discrete_pos,beta_continuous_pos,0.5)
+          beta_all_neg = c(0,beta_discrete_neg,beta_continuous_neg,0.5)
           inter = dat_discrete[,1]*dat_discrete[,2]
           dat_all = cbind(inter,dat_discrete,dat_continuous,dat_time)
         }
@@ -424,21 +424,19 @@ calc_power_common_rare <- function(N_sample=200,
       }
 
       ## sample mean
-      #print("sample mean")
 
       v_mean = sample(v_mean_transform,N_feature,replace=TRUE)
-      v_mean_common = sort(v_mean)[1:(N_feature/2)]
+      v_mean_common = sort(v_mean,decreasing=TRUE)[1:(N_feature/2)]
       index_common_pos = sample(1:length(v_mean_common),floor(pos_prop*length(v_mean_common)),replace=FALSE)
       v_mean_common_pos = v_mean_common[1:length(v_mean_common) %in% index_common_pos]
       v_mean_common_neg = v_mean_common[!(1:length(v_mean_common) %in% index_common_pos)]
 
-      v_mean_rare = sort(v_mean)[ceiling(N_feature/2+1):N_feature]
+      v_mean_rare = sort(v_mean,decreasing=TRUE)[ceiling(N_feature/2+1):N_feature]
       index_rare_pos = sample(1:length(v_mean_rare),floor(pos_prop*length(v_mean_rare)),replace=FALSE)
       v_mean_rare_pos = v_mean_rare[1:length(v_mean_rare) %in% index_rare_pos]
       v_mean_rare_neg = v_mean_rare[!(1:length(v_mean_rare) %in% index_rare_pos)]
 
       ## calculate p-value for positive features
-      #print("calculate p-value for positive features")
       dat_all_df = data.frame(dat_all)
       fix_pos = c(dat_all %*% beta_all_pos)
       v_sd_common_pos = c(rep(quartile_common[1],floor(length(v_mean_common_pos)/3)),rep(quartile_common[2],floor(length(v_mean_common_pos)/3)),rep(quartile_common[3],length(v_mean_common_pos)-floor(length(v_mean_common_pos)/3)*2))
@@ -455,7 +453,6 @@ calc_power_common_rare <- function(N_sample=200,
       pvalue_v = c(pvalue_v,unlist(lapply(summary(lm(Y_pos~.,data=dat_all_df)),get_p)))
 
       ## calculate p-value for negative features
-      #print("calculate p-value for negative features")
       fix_neg = c(dat_all %*% beta_all_neg)
       v_sd_common_neg = c(rep(quartile_common[1],floor(length(v_mean_common_neg)/3)),rep(quartile_common[2],floor(length(v_mean_common_neg)/3)),rep(quartile_common[3],length(v_mean_common_neg)-floor(length(v_mean_common_neg)/3)*2))
       v_sd_rare_neg = c(rep(quartile_rare[1],floor(length(v_mean_rare_neg)/3)),rep(quartile_rare[2],floor(length(v_mean_rare_neg)/3)),rep(quartile_rare[3],length(v_mean_rare_neg)-floor(length(v_mean_rare_neg)/3)*2))
@@ -521,13 +518,10 @@ calc_power_common_rare <- function(N_sample=200,
   while(power_current_min < 0.99){
     qvalue_matrix = matrix(rep(0,num_rep*N_feature),nrow=num_rep)
     #start.time <- Sys.time()
-    #print(power_current_min)
     for( rep.i in 1:num_rep ){
       ## initialize p-value vector for each replicate
-      #print("initialize p-value vector for each replicate")
       pvalue_v = c()
       ## simulate covariates
-      #print("simulate covariates")
       dat_continuous = matrix(rnorm(n_continuous*N_sample,mean=0,sd=1),nrow=N_sample)
       dat_discrete = matrix(rbinom(n_discrete*N_sample,size=1,prob=0.5),nrow=N_sample)
       if(N_repeat > 1){
@@ -542,14 +536,12 @@ calc_power_common_rare <- function(N_sample=200,
       }
 
       ## assign coefficient for positive features and negative features separately
-      #print("assign coefficient for positive features and negative features separately")
-      beta_continuous_neg = rep(0.1,n_continuous)
-      beta_discrete_neg = rep(0.1,n_discrete)
-      beta_continuous_pos = rep(0.1,n_continuous)
-      beta_discrete_pos = rep(0.1,n_discrete)
+      beta_continuous_neg = rep(0.5,n_continuous)
+      beta_discrete_neg = rep(0.5,n_discrete)
+      beta_continuous_pos = rep(0.5,n_continuous)
+      beta_discrete_pos = rep(0.5,n_discrete)
 
       ## assign coefficient for covariate of interest
-      #print("assign coefficient for covariate of interest")
       if(contin == "continuous"){
         beta_continuous_pos[1] = beta_interest
         beta_continuous_neg[1] = 0
@@ -559,8 +551,8 @@ calc_power_common_rare <- function(N_sample=200,
           dat_all = cbind(dat_continuous,dat_discrete)
         }
         else{
-          beta_all_pos = c(beta_continuous_pos,beta_discrete_pos,0.1)
-          beta_all_neg = c(beta_continuous_neg,beta_discrete_neg,0.1)
+          beta_all_pos = c(beta_continuous_pos,beta_discrete_pos,0.5)
+          beta_all_neg = c(beta_continuous_neg,beta_discrete_neg,0.5)
           dat_all = cbind(dat_continuous,dat_discrete,dat_time)
         }
       }
@@ -573,8 +565,8 @@ calc_power_common_rare <- function(N_sample=200,
           dat_all = cbind(dat_discrete,dat_continuous)
         }
         else{
-          beta_all_pos = c(beta_discrete_pos,beta_continuous_pos,0.1)
-          beta_all_neg = c(beta_discrete_neg,beta_continuous_neg,0.1)
+          beta_all_pos = c(beta_discrete_pos,beta_continuous_pos,0.5)
+          beta_all_neg = c(beta_discrete_neg,beta_continuous_neg,0.5)
           dat_all = cbind(dat_discrete,dat_continuous,dat_time)
         }
       }
@@ -586,8 +578,8 @@ calc_power_common_rare <- function(N_sample=200,
           dat_all = cbind(inter,dat_discrete,dat_continuous)
         }
         else{
-          beta_all_pos = c(beta_interest,beta_discrete_pos,beta_continuous_pos,0.1)
-          beta_all_neg = c(0,beta_discrete_neg,beta_continuous_neg,0.1)
+          beta_all_pos = c(beta_interest,beta_discrete_pos,beta_continuous_pos,0.5)
+          beta_all_neg = c(0,beta_discrete_neg,beta_continuous_neg,0.5)
           inter = dat_discrete[,1]*dat_discrete[,2]
           dat_all = cbind(inter,dat_discrete,dat_continuous,dat_time)
         }
@@ -604,7 +596,6 @@ calc_power_common_rare <- function(N_sample=200,
       }
 
       ## sample mean
-      #print("sample mean")
 
       v_mean = sample(v_mean_transform,N_feature,replace=TRUE)
       v_mean_common = sort(v_mean)[1:(N_feature/2)]
@@ -618,7 +609,6 @@ calc_power_common_rare <- function(N_sample=200,
       v_mean_rare_neg = v_mean_rare[!(1:length(v_mean_rare) %in% index_rare_pos)]
 
       ## calculate p-value for positive features
-      #print("calculate p-value for positive features")
       dat_all_df = data.frame(dat_all)
       fix_pos = c(dat_all %*% beta_all_pos)
       v_sd_common_pos = c(rep(quartile_common[1],floor(length(v_mean_common_pos)/3)),rep(quartile_common[2],floor(length(v_mean_common_pos)/3)),rep(quartile_common[3],length(v_mean_common_pos)-floor(length(v_mean_common_pos)/3)*2))
@@ -635,7 +625,6 @@ calc_power_common_rare <- function(N_sample=200,
       pvalue_v = c(pvalue_v,unlist(lapply(summary(lm(Y_pos~.,data=dat_all_df)),get_p)))
 
       ## calculate p-value for negative features
-      #print("calculate p-value for negative features")
       fix_neg = c(dat_all %*% beta_all_neg)
       v_sd_common_neg = c(rep(quartile_common[1],floor(length(v_mean_common_neg)/3)),rep(quartile_common[2],floor(length(v_mean_common_neg)/3)),rep(quartile_common[3],length(v_mean_common_neg)-floor(length(v_mean_common_neg)/3)*2))
       v_sd_rare_neg = c(rep(quartile_rare[1],floor(length(v_mean_rare_neg)/3)),rep(quartile_rare[2],floor(length(v_mean_rare_neg)/3)),rep(quartile_rare[3],length(v_mean_rare_neg)-floor(length(v_mean_rare_neg)/3)*2))
@@ -685,50 +674,54 @@ calc_power_common_rare <- function(N_sample=200,
   out_rare = as.data.frame(out_rare)
 
 
-  ## calculate min difference
+  ####### calculate min difference ######
+  diff_out_common = c()
+  diff_out_rare = c()
 
-  #v_sd_diff = c(v_sd_common_pos,v_sd_rare_pos,v_sd_common_neg,v_sd_rare_neg)
-  #v_mean_diff = v_mean
+  for(j in 1:100){
+  sample(v_mean_transform,N_feature,replace=TRUE)
+  v_mean_common = sort(v_mean_transform,decreasing=TRUE)[1:(length(v_mean_transform)/2)]
+  v_mean_rare = sort(v_mean_transform,decreasing = FALSE)[1:(length(v_mean_transform)/2)]
 
-  #Y_diff = matrix(rep(v_mean_diff,dim(dat_all)[1]),nrow=dim(dat_all)[1],byrow=TRUE) +
-  #  matrix(rnorm(dim(dat_all)[1]*length(v_sd_diff),mean=0,sd=rep(v_sd_diff,dim(dat_all)[1])),nrow=dim(dat_all)[1],byrow=TRUE)
-  v_mean_common = c(v_mean_common_pos,v_mean_common_neg)
-  #v_sd_common = c(v_sd_common_pos,v_sd_common_neg)
+  # common
   Y_diff_common = rnorm(dim(dat_all)[1],mean=sample(v_mean_common,dim(dat_all)[1],replace = TRUE),sd=sample(quartile_common,dim(dat_all)[1],replace = TRUE))
 
-  #fix_neg = c(dat_all %*% beta_all_neg)
-  #print(beta_all_neg)
-  #Y_diff_common = Y_diff_common + fix_neg
   dat_all_neg = dat_all
   dat_all_neg[,1] = dat_all_neg[,1] - 1
 
+  diff_out = c()
   for(i in out_common$beta){
     beta_all_pos[1] = i
-    fix_neg = c(dat_all_neg %*% beta_all_pos)
-    fix_pos = c(dat_all %*% beta_all_pos)
+    #fix_neg = c(dat_all_neg %*% beta_all_pos)
+    fix_neg = dat_all_neg[,1]*i
+    #fix_pos = c(dat_all %*% beta_all_pos)
+    fix_pos = dat_all[,1]*i
     Y_diff_pos = Y_diff_common + fix_pos
     Y_diff_neg = Y_diff_common + fix_neg
-    diff_out = c(diff_out,mean(sin(Y_diff_pos^2))-mean(sin(Y_diff_neg^2)))
+    diff_out = c(diff_out,mean(sin(Y_diff_pos^2*sign(Y_diff_pos))-mean(sin(Y_diff_neg^2*sign(Y_diff_neg)))))
   }
-  #print(diff_out)
-  out_common$diff_out = diff_out
+  diff_out_common = rbind(diff_out_common,diff_out)
 
-  diff_out = c()
 
-  v_mean_rare = c(v_mean_rare_pos,v_mean_rare_neg)
-  #v_sd_rare = c(v_sd_rare_pos,v_sd_rare_neg)
+  # rare
   Y_diff_rare = rnorm(dim(dat_all)[1],mean=sample(v_mean_rare,dim(dat_all)[1],replace = TRUE),sd=sample(quartile_rare,dim(dat_all)[1],replace = TRUE))
-
+  diff_out = c()
   for(i in out_rare$beta){
     beta_all_pos[1] = i
-    fix_neg = c(dat_all_neg %*% beta_all_pos)
-    fix_pos = c(dat_all %*% beta_all_pos)
-    Y_diff_pos = Y_diff_common + fix_pos
-    Y_diff_neg = Y_diff_common + fix_neg
-    diff_out = c(diff_out,mean(sin(Y_diff_pos^2))-mean(sin(Y_diff_neg^2)))
+    #fix_neg = c(dat_all_neg %*% beta_all_pos)
+    #fix_pos = c(dat_all %*% beta_all_pos)
+    fix_neg = dat_all_neg[,1]*i
+    fix_pos = dat_all[,1]*i
+    Y_diff_pos = Y_diff_rare + fix_pos
+    Y_diff_neg = Y_diff_rare + fix_neg
+    diff_out = c(diff_out,mean(sin(Y_diff_pos^2*sign(Y_diff_pos)))-mean(sin(Y_diff_neg^2*sign(Y_diff_neg))))
   }
-  #print(diff_out)
-  out_rare$diff_out = diff_out
+  diff_out_rare = rbind(diff_out_rare,diff_out)
+
+  }
+
+  out_common$diff_out = apply(diff_out_common,2,mean)
+  out_rare$diff_out = apply(diff_out_rare,2,mean)
   return(list(out_common=out_common,
               out_rare=out_rare))
 }

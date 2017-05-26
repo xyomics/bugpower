@@ -273,6 +273,8 @@ write_results <- function(filename,
 
 }
 
+
+
 # write methods
 write_methods <- function(filename,
                           datatype = c("species", "metagenomics_pathways","metatranscriptomics_pathways")
@@ -286,6 +288,9 @@ write_methods <- function(filename,
                      " samples and ",
                      "\\Sexpr{N_feature[\"species\"]}",
                      " features. ",
+                     "Each sample is measured for ",
+                     "\\Sexpr{N_repeat[\"species\"]}",
+                     " times. ",
                      "\\Sexpr{pos_prop[\"species\"]}",
                      " of the features are correlated with the covariate we are interested in. ",
                      "\\Sexpr{N_covariate[\"species\"]}",
@@ -302,6 +307,9 @@ write_methods <- function(filename,
                          " samples and " ,
                          "\\Sexpr{N_feature[\"metagenomics_pathways\"]}",
                          " features. ",
+                         "Each sample is measured for ",
+                         "\\Sexpr{N_repeat[\"metagenomics_pathways\"]}",
+                         " times. ",
                          "\\Sexpr{pos_prop[\"metagenomics_pathways\"]}",
                          " of the pathways are correlated with the covariate we are interested in. ",
                          "\\Sexpr{N_covariate[\"metagenomics_pathways\"]}",
@@ -317,6 +325,9 @@ write_methods <- function(filename,
                          " samples and " ,
                          "\\Sexpr{N_feature[\"metatranscriptomics_pathways\"]}",
                          " features. ",
+                         "Each sample is measured for ",
+                         "\\Sexpr{N_repeat[\"metatranscriptomics_pathways\"]}",
+                         " times. ",
                          "\\Sexpr{pos_prop[\"metatranscriptomics_pathways\"]}",
                          " of the pathways are correlated with the covariate we are interested in. ",
                          "\\Sexpr{N_covariate[\"metatranscriptomics_pathways\"]}",
@@ -400,6 +411,7 @@ write_result_plot <- function(filename,datatype){
   cat(paste0("a = calc_power_common_rare(N_sample=N_sample[\"",datatype,"\"],",
              "N_covariate=N_covariate[\"",datatype,"\"],",
              "N_feature=N_feature[\"",datatype,"\"],",
+             "N_repeat=N_repeat[\"",datatype,"\"],",
              "conti_prop=conti_prop[\"",datatype,"\"],",
              "pos_prop=pos_prop[\"",datatype,"\"],",
              "contin=contin[\"",datatype,"\"],",
@@ -420,6 +432,12 @@ write_result_plot <- function(filename,datatype){
 }
 
 write_result_table <- function(filename,datatype){
+  if(datatype == "metagenomics_pathways"){
+    datatype = "metagenomics pathways"
+  }
+  if(datatype == "metatranscriptomics_pathways"){
+    datatype = "metatranscriptomics pathways"
+  }
   text = paste("\\begin{table}[h]",
                "\\centering",
                "\\begin{tabular}{c|c|c|c}",
